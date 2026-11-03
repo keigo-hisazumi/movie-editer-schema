@@ -1,0 +1,14 @@
+{
+  "action": "cut",
+  "video": "2026-10/20261017.mp4",
+  "topics": [
+    2
+  ],
+  "status": "done",
+  "created": "Firestore の Timestamp",
+  "by": "owner@example.com",
+  "started": "2026-10-18T11:00:00+00:00",
+  "finished": "2026-10-18T11:05:00+00:00",
+  "step": "",
+  "log": "カットを作りました"
+}

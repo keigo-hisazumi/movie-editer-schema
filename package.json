@@ -1,0 +1,22 @@
+{
+  "name": "movie-editer-schema",
+  "version": "2.0.0",
+  "description": "movie-editer とビューアがやりとりするデータの形（JSON Schema）と TypeScript の型",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "types": "./ts/index.ts",
+  "exports": {
+    ".": "./ts/index.ts",
+    "./schema.json": "./movie_editer_schema/schema.json"
+  },
+  "files": ["ts", "movie_editer_schema/schema.json"],
+  "scripts": {
+    "gen": "node scripts/gen-types.mjs",
+    "check": "node scripts/gen-types.mjs --check && tsc --noEmit"
+  },
+  "devDependencies": {
+    "json-schema-to-typescript": "^16.0.0",
+    "typescript": "~6.0.3"
+  }
+}

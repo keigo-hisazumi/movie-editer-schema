@@ -1,0 +1,21 @@
+[
+  {
+    "name": "20261017",
+    "rel": "2026-10/20261017.mp4",
+    "size": 123456789,
+    "mtime": "2026-10-17T11:00:00+00:00",
+    "transcript": true,
+    "topics": 2,
+    "cuts": 1,
+    "topic_shorts": 0,
+    "learned": 1
+  },
+  {
+    "name": "20261018",
+    "rel": "2026-10/20261018.mp4",
+    "size": 1,
+    "mtime": "2026-10-18T11:00:00+00:00",
+    "transcript": false,
+    "topics": null
+  }
+]
