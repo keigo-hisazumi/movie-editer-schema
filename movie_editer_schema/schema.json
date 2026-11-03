@@ -1,0 +1,546 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/keigo-hisazumi/movie-editer-schema/schema.json",
+  "title": "MovieEditerSchema",
+  "description": "movie-editer（パイプライン）と movie-editer-viewer（ビューア）がやりとりするデータの形。Firestore のドキュメントと、その中の data（JSON 文字列）の中身。時刻は特に書かなければ元動画の秒",
+  "$comment": "版を変えたら movie_editer_schema/__init__.py の SCHEMA_VERSION と package.json・pyproject.toml の version も上げる",
+  "definitions": {
+    "Hms": {
+      "description": "元動画の時刻 \"HH:MM:SS.mmm\"（movie-editer の shorts/timefmt.py の hms）",
+      "type": "string",
+      "pattern": "^\\d{2,}:\\d{2}:\\d{2}\\.\\d{3}$"
+    },
+    "IsoTime": {
+      "description": "日時（ISO 8601）",
+      "type": "string"
+    },
+    "HmsRange": {
+      "description": "元動画の区間 [開始, 終了]",
+      "type": "array",
+      "items": { "$ref": "#/definitions/Hms" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "SecRange": {
+      "description": "元動画の区間 [開始, 終了]（秒）",
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "Point": {
+      "description": "出力画面の位置 [x, y]（px）",
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "FileDesc": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "desc": { "type": "string" }
+      },
+      "required": ["name", "desc"]
+    },
+
+    "VideoDoc": {
+      "description": "Firestore の videos/{動画名} のドキュメント（movie-editer の shorts/publish.py の publish）",
+      "type": "object",
+      "properties": {
+        "schema": { "description": "data の形式の版（SCHEMA_VERSION）", "type": "integer" },
+        "name": { "description": "動画名（元動画のファイル名から拡張子を除いたもの）", "type": "string" },
+        "updated": { "description": "出力フォルダのファイルの最終更新", "$ref": "#/definitions/IsoTime" },
+        "published": { "description": "送った日時", "$ref": "#/definitions/IsoTime" },
+        "topics_count": { "type": "integer" },
+        "shorts_count": { "type": "integer" },
+        "cuts_count": { "description": "段階式のカットの数（topic_XX/。前の版の publish には無い）", "type": "integer" },
+        "sig": { "description": "出力フォルダの中身の要約（変わったかを見分ける。前の版の publish には無い）", "type": "string" },
+        "data": { "description": "VideoData の JSON 文字列（Firestore は配列の中の配列を持てないため）", "type": "string" }
+      },
+      "required": ["schema", "name", "updated", "published", "topics_count", "shorts_count", "data"],
+      "additionalProperties": false
+    },
+
+    "VideoData": {
+      "description": "VideoDoc の data の中身（movie-editer の shorts/publish.py の build_data）",
+      "type": "object",
+      "properties": {
+        "schema": { "type": "integer" },
+        "name": { "type": "string" },
+        "updated": { "$ref": "#/definitions/IsoTime" },
+        "stream_length": { "description": "配信の長さ（秒。分からなければ null）", "type": ["number", "null"] },
+        "topics": { "description": "topics.yaml（無い・読めなければ null）", "type": ["array", "null"], "items": { "$ref": "#/definitions/Topic" } },
+        "topics_error": { "type": "string" },
+        "legacy_topics": { "description": "前の形式の topics.md だけがある", "type": "boolean" },
+        "cuts": { "description": "cuts.yaml（id はトピックの ID。無い・読めなければ null）", "type": ["array", "null"], "items": { "$ref": "#/definitions/CutSpec" } },
+        "cuts_error": { "type": "string" },
+        "topic_cuts": { "description": "topic_XX/ のカット・学習・ショートの状態", "type": "array", "items": { "$ref": "#/definitions/TopicCut" } }
+      },
+      "required": ["schema", "name", "updated", "stream_length", "topics", "topics_error", "legacy_topics"],
+      "additionalProperties": false
+    },
+
+    "Topic": {
+      "description": "topics.yaml の1トピック（movie-editer の shorts/topics.py）。start は元動画の秒",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "start": { "type": "number" },
+        "title": { "type": "string" },
+        "summary": { "type": "string" },
+        "points": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["id", "start", "title", "summary", "points"],
+      "additionalProperties": false
+    },
+
+    "SoundCue": {
+      "description": "効果音1つ（movie-editer の shorts/cutspec.py）",
+      "type": "object",
+      "properties": {
+        "at": { "type": "number" },
+        "file": { "type": "string" },
+        "db": { "description": "声との音量差（無ければ sound.se_db）", "type": ["number", "null"] }
+      },
+      "required": ["at", "file", "db"],
+      "additionalProperties": false
+    },
+    "ImageCue": {
+      "description": "重ねる画像・動画1つ（movie-editer の shorts/cutspec.py）",
+      "type": "object",
+      "properties": {
+        "at": { "type": "number" },
+        "file": { "type": "string" },
+        "end": { "description": "無ければ images.sec 秒", "type": ["number", "null"] },
+        "pos": { "description": "中心（出力の px。無ければ images の既定値）", "anyOf": [{ "$ref": "#/definitions/Point" }, { "type": "null" }] },
+        "width": { "description": "幅（px）。\"band\" で中央の帯いっぱい", "type": ["number", "string", "null"] }
+      },
+      "required": ["at", "file", "end"],
+      "additionalProperties": false
+    },
+    "CutSpec": {
+      "description": "cuts.yaml の1項目（movie-editer の shorts/cutspec.py）。時刻は元動画の秒",
+      "type": "object",
+      "properties": {
+        "id": { "description": "トピックの ID", "type": "integer" },
+        "start": { "type": "number" },
+        "end": { "type": "number" },
+        "title": { "type": "string" },
+        "titles": { "type": "array", "items": { "type": "string" } },
+        "heading": { "type": "string" },
+        "summary": { "type": "string" },
+        "reason": { "type": "string" },
+        "drop": { "type": "array", "items": { "$ref": "#/definitions/SecRange" } },
+        "bgm": { "type": ["string", "null"] },
+        "bgm_offset": { "type": "number" },
+        "bgm_db": { "type": ["number", "null"] },
+        "se": { "type": "array", "items": { "$ref": "#/definitions/SoundCue" } },
+        "images": { "type": "array", "items": { "$ref": "#/definitions/ImageCue" } }
+      },
+      "required": ["id", "start", "end", "title", "titles", "heading", "summary", "reason", "drop", "bgm", "bgm_offset", "se", "images"],
+      "additionalProperties": false
+    },
+
+    "TopicCut": {
+      "description": "output/<動画名>/topic_XX/ のカット・微調整した XML・ショートの状態（movie-editer の shorts/topiccut.py の topic_summary）",
+      "type": "object",
+      "properties": {
+        "name": { "description": "topic_XX", "type": "string" },
+        "topic": { "type": "integer" },
+        "files": { "type": "array", "items": { "type": "string" } },
+        "cut": { "description": "cut.json（まだなら null）", "anyOf": [{ "$ref": "#/definitions/CutMemo" }, { "type": "null" }] },
+        "adjusted": { "description": "人が微調整して書き出した XML のファイル名", "type": ["string", "null"] },
+        "adjusted_mtime": { "anyOf": [{ "$ref": "#/definitions/IsoTime" }, { "type": "null" }] },
+        "memo": { "description": "ショートの memo.json（まだなら null）", "anyOf": [{ "$ref": "#/definitions/Memo" }, { "type": "null" }] },
+        "learn": { "description": "learn.json の要約（まだなら null）", "anyOf": [{ "$ref": "#/definitions/LearnBrief" }, { "type": "null" }] },
+        "lessons": { "description": "lessons.yaml（まだなら null）", "anyOf": [{ "$ref": "#/definitions/Lessons" }, { "type": "null" }] }
+      },
+      "required": ["name", "topic", "files", "cut", "adjusted", "adjusted_mtime", "memo"],
+      "additionalProperties": false
+    },
+
+    "CutMemo": {
+      "description": "topic_XX/cut.json（movie-editer の shorts/topiccut.py の make_cut）",
+      "type": "object",
+      "properties": {
+        "topic": { "type": "integer" },
+        "title": { "type": "string" },
+        "titles": { "type": "array", "items": { "type": "string" } },
+        "heading": { "type": "string" },
+        "summary": { "type": "string" },
+        "reason": { "type": "string" },
+        "start": { "$ref": "#/definitions/Hms" },
+        "end": { "$ref": "#/definitions/Hms" },
+        "duration": { "type": "number" },
+        "removed": { "description": "詰めたものの種類ごとの秒", "type": "object", "additionalProperties": { "type": "number" } },
+        "cuts": { "description": "残した区間", "type": "array", "items": { "$ref": "#/definitions/HmsRange" } },
+        "drop": { "type": "array", "items": { "$ref": "#/definitions/HmsRange" } },
+        "files": { "type": "array", "items": { "$ref": "#/definitions/FileDesc" } },
+        "made": { "$ref": "#/definitions/IsoTime" }
+      },
+      "required": ["topic", "title", "titles", "heading", "summary", "reason", "start", "end", "duration", "removed", "cuts", "drop", "files", "made"]
+    },
+
+    "Lessons": {
+      "description": "topic_XX/lessons.yaml（cut：カットの直しから、short：仕上がりから）",
+      "type": "object",
+      "properties": {
+        "cut": { "type": "array", "items": { "type": "string" } },
+        "short": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["cut", "short"],
+      "additionalProperties": false
+    },
+
+    "LearnChange": {
+      "description": "文ごとの違い（movie-editer の shorts/learn.py）",
+      "type": "object",
+      "properties": {
+        "start": { "$ref": "#/definitions/Hms" },
+        "end": { "$ref": "#/definitions/Hms" },
+        "text": { "type": "string" },
+        "change": { "description": "外した・一部を外した・戻した・一部を戻した", "type": "string" },
+        "words": { "description": "一部を外した・戻した語", "type": "string" },
+        "why": { "description": "戻した文がカットでなぜ外れていたか", "type": "string" },
+        "in_gap": { "description": "外した文が、仕上がりの元動画のクリップが無い所の文字に出ている（残しているかもしれない）", "type": "string" }
+      },
+      "required": ["start", "end", "text", "change"]
+    },
+    "Span": {
+      "type": "object",
+      "properties": {
+        "start": { "$ref": "#/definitions/Hms" },
+        "end": { "$ref": "#/definitions/Hms" },
+        "duration": { "type": "number" },
+        "count": { "type": "integer" }
+      },
+      "required": ["start", "end", "duration", "count"]
+    },
+    "Pause": {
+      "description": "間 [元動画の時刻, 秒]",
+      "type": "array",
+      "items": [{ "$ref": "#/definitions/Hms" }, { "type": "number" }],
+      "additionalItems": false,
+      "minItems": 2
+    },
+    "LearnBrief": {
+      "description": "topic_XX/learn.json の要約（movie-editer の shorts/topiccut.py の _learn_brief）",
+      "type": "object",
+      "properties": {
+        "adjusted_xml": { "type": "string" },
+        "adjusted_mtime": { "type": "string" },
+        "cut": { "$ref": "#/definitions/Span" },
+        "adjusted": { "$ref": "#/definitions/Span" },
+        "head": { "description": "+：人が頭を遅らせた", "type": "number" },
+        "tail": { "description": "-：人が終わりを早めた", "type": "number" },
+        "removed_sec": { "type": "number" },
+        "added_sec": { "type": "number" },
+        "counts": { "type": "object", "additionalProperties": { "type": "number" } },
+        "changes": { "type": "array", "items": { "$ref": "#/definitions/LearnChange" } },
+        "pauses_removed": { "description": "人が詰めた間", "type": ["array", "null"], "items": { "$ref": "#/definitions/Pause" } },
+        "pauses_added": { "description": "人が戻した間", "type": ["array", "null"], "items": { "$ref": "#/definitions/Pause" } },
+        "notes": { "type": ["array", "null"], "items": { "type": "string" } },
+        "finish": { "description": "仕上がり（前の版の learn.json には無い）", "anyOf": [{ "$ref": "#/definitions/Finish" }, { "type": "null" }] },
+        "made": { "type": "string" }
+      },
+      "required": ["adjusted_xml", "adjusted_mtime", "cut", "adjusted", "head", "tail", "removed_sec", "added_sec", "counts", "changes", "made"]
+    },
+
+    "Finish": {
+      "description": "人が Filmora で仕上げたショートの作り（movie-editer の shorts/finish.py。learn.json の finish）。時刻はショートの秒",
+      "type": "object",
+      "properties": {
+        "xml": { "type": "string" },
+        "duration": { "type": "number" },
+        "size": { "$ref": "#/definitions/Point" },
+        "clips": { "description": "元動画のクリップの数", "type": "integer" },
+        "title": { "description": "ずっと出ている文字（タイトル・見出し）", "type": ["string", "null"] },
+        "title_match": { "description": "カットの「見出し」「タイトル案N」と同じなら、その名前", "type": ["string", "null"] },
+        "zoom": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "scale": { "type": ["number", "null"] },
+              "pos": { "anyOf": [{ "$ref": "#/definitions/Point" }, { "type": "null" }] },
+              "sec": { "type": "number" },
+              "count": { "type": "integer" }
+            },
+            "required": ["scale", "pos", "sec", "count"]
+          }
+        },
+        "moved": {
+          "description": "元動画の順から動かしたクリップ（先出し）",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "start": { "type": "number" },
+              "end": { "type": "number" },
+              "src": { "type": "string" },
+              "said": { "type": "string" }
+            },
+            "required": ["start", "end", "src", "said"]
+          }
+        },
+        "gaps": {
+          "description": "元動画のクリップが無い所と、そこに出ている文字",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "start": { "type": "number" },
+              "end": { "type": "number" },
+              "texts": { "type": "array", "items": { "type": "string" } }
+            },
+            "required": ["start", "end", "texts"]
+          }
+        },
+        "captions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "start": { "type": "number" },
+              "end": { "type": "number" },
+              "text": { "type": "string" }
+            },
+            "required": ["start", "end", "text"]
+          }
+        },
+        "caption_stats": {
+          "type": "object",
+          "properties": {
+            "count": { "type": "integer" },
+            "max_chars": { "type": "integer" },
+            "avg_chars": { "type": "number" },
+            "avg_sec": { "type": "number" }
+          },
+          "required": ["count", "max_chars", "avg_chars", "avg_sec"]
+        },
+        "emphasis": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "start": { "type": "number" },
+              "end": { "type": "number" },
+              "said": { "type": "string" },
+              "text": { "type": "string" },
+              "track": { "type": "integer" },
+              "over_caption": { "type": "boolean" }
+            },
+            "required": ["start", "end", "text", "track", "over_caption"]
+          }
+        },
+        "images": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "start": { "type": "number" },
+              "end": { "type": "number" },
+              "said": { "type": "string" },
+              "name": { "type": "string" },
+              "track": { "type": "integer" },
+              "scale": { "type": ["number", "null"] },
+              "pos": { "anyOf": [{ "$ref": "#/definitions/Point" }, { "type": "null" }] }
+            },
+            "required": ["start", "end", "name", "track", "scale", "pos"]
+          }
+        },
+        "se": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "start": { "type": "number" },
+              "end": { "type": "number" },
+              "said": { "type": "string" },
+              "name": { "type": "string" },
+              "track": { "type": "integer" },
+              "db": { "type": "number" }
+            },
+            "required": ["start", "end", "name", "track", "db"]
+          }
+        },
+        "bgm": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "start": { "type": "number" },
+              "end": { "type": "number" },
+              "said": { "type": "string" },
+              "name": { "type": "string" },
+              "track": { "type": "integer" },
+              "db": { "type": "number" },
+              "from": { "type": "number" }
+            },
+            "required": ["start", "end", "name", "track", "db", "from"]
+          }
+        },
+        "notes": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["xml", "duration", "size", "clips", "title", "title_match", "zoom", "moved", "gaps", "captions", "caption_stats", "emphasis", "images", "se", "bgm", "notes"]
+    },
+
+    "Memo": {
+      "description": "topic_XX/memo.json（ショート。movie-editer の shorts/make_short.py）。いまの段階式では作らないので、どれも任意",
+      "type": "object",
+      "properties": {
+        "spec": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "integer" },
+            "title": { "type": "string" },
+            "titles": { "type": "array", "items": { "type": "string" } },
+            "summary": { "type": "string" },
+            "reason": { "type": "string" },
+            "start": { "type": "string" },
+            "end": { "type": "string" }
+          }
+        },
+        "duration": { "type": "number" },
+        "note": { "type": "string" },
+        "start": { "type": "string" },
+        "end": { "type": "string" },
+        "snap": { "type": "string" },
+        "removed": { "type": "object", "additionalProperties": { "type": "number" } },
+        "cuts": { "type": "array", "items": { "$ref": "#/definitions/HmsRange" } },
+        "drop": { "type": "array", "items": { "$ref": "#/definitions/HmsRange" } },
+        "fillers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "at": { "type": "string" }, "text": { "type": "string" } },
+            "required": ["at", "text"]
+          }
+        },
+        "texts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "text": { "type": "string" },
+              "font": { "type": "string" },
+              "size": { "type": "number" },
+              "color": { "type": "string" }
+            },
+            "required": ["name", "text", "font", "size", "color"]
+          }
+        },
+        "bgm": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": { "name": { "type": "string" }, "from": { "type": "number" }, "db": { "type": "number" } },
+              "required": ["name", "from", "db"]
+            },
+            { "type": "null" }
+          ]
+        },
+        "se": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "at": { "type": "number" }, "name": { "type": "string" }, "db": { "type": "number" } },
+            "required": ["at", "name", "db"]
+          }
+        },
+        "voice_db": { "type": ["number", "null"] },
+        "sound_notes": { "type": "array", "items": { "type": "string" } },
+        "images": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "name": { "type": "string" }, "start": { "type": "number" }, "end": { "type": "number" } },
+            "required": ["name", "start", "end"]
+          }
+        },
+        "image_notes": { "type": "array", "items": { "type": "string" } },
+        "files": { "type": "array", "items": { "$ref": "#/definitions/FileDesc" } },
+        "topic": { "type": "integer" },
+        "source_xml": { "description": "読み込んだ微調整の XML", "type": "string" },
+        "source_notes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
+    "LearningDoc": {
+      "description": "Firestore の sources/learning（出力フォルダ直下の学び。movie-editer の shorts/publish.py の publish_learning）",
+      "type": "object",
+      "properties": {
+        "updated": { "$ref": "#/definitions/IsoTime" },
+        "cut": { "description": "cut_learning.md", "type": "string" },
+        "short": { "description": "short_learning.md", "type": "string" }
+      },
+      "required": ["updated", "cut", "short"],
+      "additionalProperties": false
+    },
+
+    "SourcesDoc": {
+      "description": "Firestore の sources/all（元動画の一覧。movie-editer の shorts/remote.py）",
+      "type": "object",
+      "properties": {
+        "updated": { "description": "送った日時", "$ref": "#/definitions/IsoTime" },
+        "count": { "type": "integer" },
+        "data": { "description": "SourceItem[] の JSON 文字列", "type": "string" }
+      },
+      "required": ["updated", "count", "data"],
+      "additionalProperties": false
+    },
+    "SourceItem": {
+      "description": "video_dir の元動画1本と、その出力フォルダの状態（movie-editer の shorts/remote.py の scan_sources）",
+      "type": "object",
+      "properties": {
+        "name": { "description": "動画名（出力フォルダ名）", "type": "string" },
+        "rel": { "description": "video_dir からの相対パス（依頼の video に使う）", "type": "string" },
+        "size": { "type": "integer" },
+        "mtime": { "$ref": "#/definitions/IsoTime" },
+        "transcript": { "type": "boolean" },
+        "topics": { "description": "topics.yaml の件数（無ければ null、読めなければ -1）", "type": ["integer", "null"] },
+        "cuts": { "description": "カットの数（topic_XX/）", "type": "integer" },
+        "topic_shorts": { "description": "ショートの数（topic_XX/）", "type": "integer" },
+        "learned": { "description": "微調整を学習したトピックの数", "type": "integer" }
+      },
+      "required": ["name", "rel", "size", "mtime", "transcript", "topics"],
+      "additionalProperties": false
+    },
+    "SourceItems": {
+      "description": "SourcesDoc の data の中身",
+      "type": "array",
+      "items": { "$ref": "#/definitions/SourceItem" }
+    },
+
+    "RequestAction": {
+      "description": "topics：トピックだけ／cut：選んだトピックのカット／learn：微調整した XML とカットの違いを学ぶ／short：微調整した XML からショート（いまはボタンを出していない）／scan：一覧を送り直すだけ",
+      "type": "string",
+      "enum": ["topics", "cut", "learn", "short", "scan"]
+    },
+    "RequestStatus": {
+      "type": "string",
+      "enum": ["queued", "running", "done", "error"]
+    },
+    "RequestDoc": {
+      "description": "Firestore の requests/{id}。ビューアが queued で書き、movie-editer の watch（shorts/remote.py）が状態を書き戻す。created は Firestore の Timestamp なので JSON では形を決めない",
+      "type": "object",
+      "properties": {
+        "action": { "$ref": "#/definitions/RequestAction" },
+        "video": { "description": "SourceItem.rel（scan は空）", "type": "string" },
+        "topics": { "description": "cut・learn・short のトピック ID", "type": "array", "items": { "type": "integer" } },
+        "status": { "$ref": "#/definitions/RequestStatus" },
+        "created": { "description": "Firestore の serverTimestamp()" },
+        "by": { "description": "依頼したユーザーのメールアドレス", "type": "string" },
+        "started": { "$ref": "#/definitions/IsoTime" },
+        "finished": { "$ref": "#/definitions/IsoTime" },
+        "step": { "type": "string" },
+        "log": { "description": "Claude Code の報告", "type": "string" },
+        "error": { "type": "string" }
+      },
+      "required": ["action", "video", "status", "created", "by"],
+      "additionalProperties": false
+    }
+  }
+}
