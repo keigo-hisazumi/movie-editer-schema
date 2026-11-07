@@ -468,6 +468,58 @@
       }
     },
 
+
+    "FrameRange": {
+      "description": "フレームの区間。start を含み end を含まない（fps は EditDoc.fps）",
+      "type": "object",
+      "properties": {
+        "start": { "type": "integer", "minimum": 0 },
+        "end": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["start", "end"],
+      "additionalProperties": false
+    },
+    "EditCaption": {
+      "description": "字幕1つ。start・end は元動画のフレーム番号（end は含まない）。カットを直しても元の発話に付いたままになるよう、ショートの時刻でなく元動画の時刻で持つ",
+      "type": "object",
+      "properties": {
+        "start": { "type": "integer", "minimum": 0 },
+        "end": { "type": "integer", "minimum": 0 },
+        "text": { "description": "表示する文字（1行）", "type": "string" }
+      },
+      "required": ["start", "end", "text"],
+      "additionalProperties": false
+    },
+    "EditBy": {
+      "description": "ai：AI の下書き／human：人の手直し",
+      "type": "string",
+      "enum": ["ai", "human"]
+    },
+    "EditStep": {
+      "description": "draft：AI の下書き（/cut）／cut：カットの調整／captions：字幕の調整",
+      "type": "string",
+      "enum": ["draft", "cut", "captions"]
+    },
+    "EditDoc": {
+      "description": "topic_XX/edit.json（トピックの編集の記録。カットと字幕の正本で、XML・srt はここから作る）。保存のたびに revision を上げ、前の版は topic_XX/edits/ に残す",
+      "type": "object",
+      "properties": {
+        "format": { "description": "edit.json の形式の版", "type": "integer", "const": 1 },
+        "video": { "description": "動画名", "type": "string" },
+        "topic": { "type": "integer" },
+        "fps": { "description": "フレームを数える fps（movie-editer の probe.py の edit_fps。可変フレームレートの録画も 30）", "type": "number" },
+        "revision": { "description": "版（1 から。保存のたびに +1）", "type": "integer", "minimum": 1 },
+        "by": { "$ref": "#/definitions/EditBy" },
+        "step": { "$ref": "#/definitions/EditStep" },
+        "made": { "$ref": "#/definitions/IsoTime" },
+        "note": { "description": "直したことのメモ（任意）", "type": "string" },
+        "keeps": { "description": "残す区間（元動画のフレーム番号）。並び順がショートの順", "type": "array", "items": { "$ref": "#/definitions/FrameRange" } },
+        "captions": { "description": "字幕（元動画のフレーム番号。ショートの時刻順）", "type": "array", "items": { "$ref": "#/definitions/EditCaption" } }
+      },
+      "required": ["format", "video", "topic", "fps", "revision", "by", "step", "made", "keeps", "captions"],
+      "additionalProperties": false
+    },
+
     "LearningDoc": {
       "description": "Firestore の sources/learning（出力フォルダ直下の学び。movie-editer の shorts/publish.py の publish_learning）",
       "type": "object",

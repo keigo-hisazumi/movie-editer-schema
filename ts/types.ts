@@ -54,6 +54,20 @@ export type Point = [number, number];
  */
 export type Pause = [Hms, number];
 /**
+ * ai：AI の下書き／human：人の手直し
+ *
+ * This interface was referenced by `MovieEditerSchema`'s JSON-Schema
+ * via the `definition` "EditBy".
+ */
+export type EditBy = 'ai' | 'human';
+/**
+ * draft：AI の下書き（/cut）／cut：カットの調整／captions：字幕の調整
+ *
+ * This interface was referenced by `MovieEditerSchema`'s JSON-Schema
+ * via the `definition` "EditStep".
+ */
+export type EditStep = 'draft' | 'cut' | 'captions';
+/**
  * SourcesDoc の data の中身
  *
  * This interface was referenced by `MovieEditerSchema`'s JSON-Schema
@@ -538,6 +552,70 @@ export interface Finish {
 export interface Lessons {
   cut: string[];
   short: string[];
+}
+/**
+ * フレームの区間。start を含み end を含まない（fps は EditDoc.fps）
+ *
+ * This interface was referenced by `MovieEditerSchema`'s JSON-Schema
+ * via the `definition` "FrameRange".
+ */
+export interface FrameRange {
+  start: number;
+  end: number;
+}
+/**
+ * 字幕1つ。start・end は元動画のフレーム番号（end は含まない）。カットを直しても元の発話に付いたままになるよう、ショートの時刻でなく元動画の時刻で持つ
+ *
+ * This interface was referenced by `MovieEditerSchema`'s JSON-Schema
+ * via the `definition` "EditCaption".
+ */
+export interface EditCaption {
+  start: number;
+  end: number;
+  /**
+   * 表示する文字（1行）
+   */
+  text: string;
+}
+/**
+ * topic_XX/edit.json（トピックの編集の記録。カットと字幕の正本で、XML・srt はここから作る）。保存のたびに revision を上げ、前の版は topic_XX/edits/ に残す
+ *
+ * This interface was referenced by `MovieEditerSchema`'s JSON-Schema
+ * via the `definition` "EditDoc".
+ */
+export interface EditDoc {
+  /**
+   * edit.json の形式の版
+   */
+  format: 1;
+  /**
+   * 動画名
+   */
+  video: string;
+  topic: number;
+  /**
+   * フレームを数える fps（movie-editer の probe.py の edit_fps。可変フレームレートの録画も 30）
+   */
+  fps: number;
+  /**
+   * 版（1 から。保存のたびに +1）
+   */
+  revision: number;
+  by: EditBy;
+  step: EditStep;
+  made: IsoTime;
+  /**
+   * 直したことのメモ（任意）
+   */
+  note?: string;
+  /**
+   * 残す区間（元動画のフレーム番号）。並び順がショートの順
+   */
+  keeps: FrameRange[];
+  /**
+   * 字幕（元動画のフレーム番号。ショートの時刻順）
+   */
+  captions: EditCaption[];
 }
 /**
  * Firestore の sources/learning（出力フォルダ直下の学び。movie-editer の shorts/publish.py の publish_learning）

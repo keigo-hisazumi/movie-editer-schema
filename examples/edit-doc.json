@@ -1,0 +1,19 @@
+{
+  "format": 1,
+  "video": "20261017",
+  "topic": 2,
+  "fps": 30,
+  "revision": 2,
+  "by": "human",
+  "step": "cut",
+  "made": "2026-11-07T12:00:00+00:00",
+  "note": "前置きを外した",
+  "keeps": [
+    { "start": 11172, "end": 11400 },
+    { "start": 11475, "end": 11910 }
+  ],
+  "captions": [
+    { "start": 11175, "end": 11210, "text": "え、待って" },
+    { "start": 11480, "end": 11530, "text": "ええええ！？" }
+  ]
+}

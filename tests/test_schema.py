@@ -19,6 +19,7 @@ EXAMPLES = {
     "source-items": "SourceItems",
     "request-doc": "RequestDoc",
     "learning-doc": "LearningDoc",
+    "edit-doc": "EditDoc",
 }
 
 
