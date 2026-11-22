@@ -248,15 +248,29 @@
     },
 
     "Finish": {
-      "description": "人が Filmora で仕上げたショートの作り（movie-editer の shorts/finish.py。learn.json の finish）。時刻はショートの秒",
+      "description": "人が仕上げたショートの作り（movie-editer の shorts/finish.py。learn.json の finish）。Premiere のプロジェクト（.prproj）か FCP7 XML（Filmora・Premiere の書き出し）から読む。時刻はショートの秒",
       "type": "object",
       "properties": {
-        "xml": { "type": "string" },
+        "xml": { "description": "読んだファイル（XML か .prproj）の名前", "type": "string" },
+        "source": { "description": "読んだものの種類（前の版の learn.json には無い。無ければ xml）", "enum": ["xml", "prproj"] },
         "duration": { "type": "number" },
         "size": { "$ref": "#/definitions/Point" },
         "clips": { "description": "元動画のクリップの数", "type": "integer" },
         "title": { "description": "ずっと出ている文字（タイトル・見出し）", "type": ["string", "null"] },
         "title_match": { "description": "カットの「見出し」「タイトル案N」と同じなら、その名前", "type": ["string", "null"] },
+        "screen_texts": {
+          "description": "ずっと出ている文字（タイトル・見出し・名前など。前の版には無い）",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "text": { "type": "string" },
+              "font": { "type": "string" },
+              "nested": { "description": "画面の文字の型など、ネストしたシーケンスの名前（.prproj）", "type": "string" }
+            },
+            "required": ["text"]
+          }
+        },
         "zoom": {
           "type": "array",
           "items": {
@@ -268,6 +282,23 @@
               "count": { "type": "integer" }
             },
             "required": ["scale", "pos", "sec", "count"]
+          }
+        },
+        "zoom_moves": {
+          "description": "寄りの動き（モーションのキーフレーム。.prproj だけ。前の版には無い）",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "start": { "type": "number" },
+              "end": { "type": "number" },
+              "from": { "type": ["number", "null"] },
+              "to": { "type": ["number", "null"] },
+              "from_pos": { "anyOf": [{ "$ref": "#/definitions/Point" }, { "type": "null" }] },
+              "to_pos": { "anyOf": [{ "$ref": "#/definitions/Point" }, { "type": "null" }] },
+              "said": { "type": "string" }
+            },
+            "required": ["start", "end", "from", "to"]
           }
         },
         "moved": {
@@ -304,7 +335,10 @@
             "properties": {
               "start": { "type": "number" },
               "end": { "type": "number" },
-              "text": { "type": "string" }
+              "text": { "type": "string" },
+              "style": { "description": "字幕のスタイル名（.prproj の字幕トラックのスタイル。話す人ごとなど）", "type": ["string", "null"] },
+              "font": { "type": ["string", "null"] },
+              "track": { "description": "字幕トラックの番号（1 から。.prproj）", "type": "integer" }
             },
             "required": ["start", "end", "text"]
           }
@@ -319,6 +353,53 @@
           },
           "required": ["count", "max_chars", "avg_chars", "avg_sec"]
         },
+        "caption_styles": {
+          "description": "字幕のスタイルごとの数とフォント（.prproj。前の版には無い）",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "style": { "type": ["string", "null"] },
+              "font": { "type": ["string", "null"] },
+              "count": { "type": "integer" }
+            },
+            "required": ["style", "font", "count"]
+          }
+        },
+        "caption_changes": {
+          "description": "作った字幕（base の srt）と比べた、人の字幕の直し。元動画の時刻でつき合わせる（前の版には無い。比べられなければ null）",
+          "anyOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "properties": {
+                "base": { "description": "比べた字幕のファイル（edit.srt・studio.srt・cut.srt）", "type": "string" },
+                "counts": { "description": "違いの種類ごとの数", "type": "object", "additionalProperties": { "type": "integer" } },
+                "items": {
+                  "description": "そのまま以外の違い",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "change": {
+                        "description": "区切りを変えた・直した・足した・消した・強調の文字にした・強調の文字の間は消した・カットで外した",
+                        "type": "string"
+                      },
+                      "start": { "description": "仕上がりのショートの秒（声も無くなったものには無い）", "type": "number" },
+                      "end": { "type": "number" },
+                      "src": { "description": "消した字幕の元動画の時刻", "type": "string" },
+                      "before": { "type": "string" },
+                      "after": { "type": "string" },
+                      "style": { "type": "string" }
+                    },
+                    "required": ["change", "before", "after"]
+                  }
+                }
+              },
+              "required": ["base", "counts", "items"]
+            }
+          ]
+        },
         "emphasis": {
           "type": "array",
           "items": {
@@ -329,7 +410,8 @@
               "said": { "type": "string" },
               "text": { "type": "string" },
               "track": { "type": "integer" },
-              "over_caption": { "type": "boolean" }
+              "over_caption": { "type": "boolean" },
+              "font": { "type": ["string", "null"] }
             },
             "required": ["start", "end", "text", "track", "over_caption"]
           }

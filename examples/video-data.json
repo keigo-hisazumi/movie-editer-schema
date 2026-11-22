@@ -157,7 +157,8 @@
         "pauses_added": [],
         "notes": [],
         "finish": {
-          "xml": "20261017_topic_03_仕上げ.xml",
+          "xml": "20261017_topic_03_short_r0002.prproj",
+          "source": "prproj",
           "duration": 58.2,
           "size": [
             1080,
@@ -166,6 +167,13 @@
           "clips": 14,
           "title": "アラサーOLお姉さん",
           "title_match": "見出し",
+          "screen_texts": [
+            {
+              "text": "アラサーOLお姉さん",
+              "font": "07AkazukinPop",
+              "nested": "ベースフレーム"
+            }
+          ],
           "zoom": [
             {
               "scale": 120.0,
@@ -175,6 +183,23 @@
               ],
               "sec": 3.5,
               "count": 2
+            }
+          ],
+          "zoom_moves": [
+            {
+              "start": 0.3,
+              "end": 0.47,
+              "from": 180.0,
+              "to": 280.0,
+              "from_pos": [
+                940,
+                1715
+              ],
+              "to_pos": [
+                1250,
+                2087
+              ],
+              "said": "さようなら"
             }
           ],
           "moved": [
@@ -198,7 +223,10 @@
             {
               "start": 0.0,
               "end": 1.2,
-              "text": "え、待って"
+              "text": "え、待って",
+              "style": "大森字幕",
+              "font": "07AkazukinPop",
+              "track": 1
             }
           ],
           "caption_stats": {
@@ -207,6 +235,36 @@
             "avg_chars": 6.1,
             "avg_sec": 1.3
           },
+          "caption_styles": [
+            {
+              "style": "大森字幕",
+              "font": "07AkazukinPop",
+              "count": 42
+            }
+          ],
+          "caption_changes": {
+            "base": "edit.srt",
+            "counts": {
+              "そのまま": 40,
+              "強調の文字にした": 1,
+              "カットで外した": 1
+            },
+            "items": [
+              {
+                "change": "強調の文字にした",
+                "start": 20.1,
+                "src": "00:13:58.000",
+                "before": "ええええ",
+                "after": "［ええええ！？］"
+              },
+              {
+                "change": "カットで外した",
+                "src": "00:14:02.000",
+                "before": "えーっと",
+                "after": ""
+              }
+            ]
+          },
           "emphasis": [
             {
               "start": 20.1,
@@ -214,7 +272,8 @@
               "said": "ええええ",
               "text": "ええええ！？",
               "track": 4,
-              "over_caption": true
+              "over_caption": true,
+              "font": "851CHIKARA-YOWAKU"
             }
           ],
           "images": [
