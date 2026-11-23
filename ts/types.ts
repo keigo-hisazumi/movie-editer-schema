@@ -452,13 +452,20 @@ export interface LearnChange {
   in_gap?: string;
 }
 /**
- * 人が Filmora で仕上げたショートの作り（movie-editer の shorts/finish.py。learn.json の finish）。時刻はショートの秒
+ * 人が仕上げたショートの作り（movie-editer の shorts/finish.py。learn.json の finish）。Premiere のプロジェクト（.prproj）か FCP7 XML（Filmora・Premiere の書き出し）から読む。時刻はショートの秒
  *
  * This interface was referenced by `MovieEditerSchema`'s JSON-Schema
  * via the `definition` "Finish".
  */
 export interface Finish {
+  /**
+   * 読んだファイル（XML か .prproj）の名前
+   */
   xml: string;
+  /**
+   * 読んだものの種類（前の版の learn.json には無い。無ければ xml）
+   */
+  source?: 'xml' | 'prproj';
   duration: number;
   size: Point;
   /**
@@ -473,11 +480,34 @@ export interface Finish {
    * カットの「見出し」「タイトル案N」と同じなら、その名前
    */
   title_match: string | null;
+  /**
+   * ずっと出ている文字（タイトル・見出し・名前など。前の版には無い）
+   */
+  screen_texts?: {
+    text: string;
+    font?: string;
+    /**
+     * 画面の文字の型など、ネストしたシーケンスの名前（.prproj）
+     */
+    nested?: string;
+  }[];
   zoom: {
     scale: number | null;
     pos: Point | null;
     sec: number;
     count: number;
+  }[];
+  /**
+   * 寄りの動き（モーションのキーフレーム。.prproj だけ。前の版には無い）
+   */
+  zoom_moves?: {
+    start: number;
+    end: number;
+    from: number | null;
+    to: number | null;
+    from_pos?: Point | null;
+    to_pos?: Point | null;
+    said?: string;
   }[];
   /**
    * 元動画の順から動かしたクリップ（先出し）
@@ -500,12 +530,65 @@ export interface Finish {
     start: number;
     end: number;
     text: string;
+    /**
+     * 字幕のスタイル名（.prproj の字幕トラックのスタイル。話す人ごとなど）
+     */
+    style?: string | null;
+    font?: string | null;
+    /**
+     * 字幕トラックの番号（1 から。.prproj）
+     */
+    track?: number;
   }[];
   caption_stats: {
     count: number;
     max_chars: number;
     avg_chars: number;
     avg_sec: number;
+  };
+  /**
+   * 字幕のスタイルごとの数とフォント（.prproj。前の版には無い）
+   */
+  caption_styles?: {
+    style: string | null;
+    font: string | null;
+    count: number;
+  }[];
+  /**
+   * 作った字幕（base の srt）と比べた、人の字幕の直し。元動画の時刻でつき合わせる（前の版には無い。比べられなければ null）
+   */
+  caption_changes?: null | {
+    /**
+     * 比べた字幕のファイル（edit.srt・studio.srt・cut.srt）
+     */
+    base: string;
+    /**
+     * 違いの種類ごとの数
+     */
+    counts: {
+      [k: string]: number;
+    };
+    /**
+     * そのまま以外の違い
+     */
+    items: {
+      /**
+       * 区切りを変えた・直した・足した・消した・強調の文字にした・強調の文字の間は消した・カットで外した
+       */
+      change: string;
+      /**
+       * 仕上がりのショートの秒（声も無くなったものには無い）
+       */
+      start?: number;
+      end?: number;
+      /**
+       * 消した字幕の元動画の時刻
+       */
+      src?: string;
+      before: string;
+      after: string;
+      style?: string;
+    }[];
   };
   emphasis: {
     start: number;
@@ -514,6 +597,7 @@ export interface Finish {
     text: string;
     track: number;
     over_caption: boolean;
+    font?: string | null;
   }[];
   images: {
     start: number;
